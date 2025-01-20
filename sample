@@ -1,0 +1,100 @@
+#include <iostream>
+#include <map>
+#include <variant>
+#include <string>
+#include <memory>
+
+// Общий интерфейс с методом SyncData
+class ISyncable {
+public:
+    virtual void SyncData() = 0;
+    virtual ~ISyncable() = default;
+};
+
+// Класс Tank, реализующий интерфейс ISyncable
+class Tank : public ISyncable {
+public:
+    void SyncData() override {
+        std::cout << "Tank is syncing data!" << std::endl;
+    }
+
+    void shoot() {
+        std::cout << "Tank is shooting!" << std::endl;
+    }
+};
+
+// Класс Battle, реализующий интерфейс ISyncable
+class Battle : public ISyncable {
+public:
+    void SyncData() override {
+        std::cout << "Battle is syncing data!" << std::endl;
+    }
+
+    void fight() {
+        std::cout << "Battle is fighting!" << std::endl;
+    }
+};
+
+// Определяем тип variant, который может хранить Tank или Battle
+using Entity = std::variant<Tank, Battle>;
+
+// Класс, содержащий контейнер и метод getElement
+class EntityContainer {
+private:
+    std::map<std::string, std::shared_ptr<Entity>> container;
+
+public:
+    // Добавляем элемент в контейнер
+    void addEntity(const std::string& key, const std::shared_ptr<Entity>& entity) {
+        container[key] = entity;
+    }
+
+    // Шаблонный геттер для получения элемента по ключу
+    template <typename T>
+    std::shared_ptr<T> getElement(const std::string& key) {
+        auto it = container.find(key);
+        if (it != container.end()) {
+            // Проверяем, содержит ли variant объект типа T
+            if (std::holds_alternative<T>(*it->second)) {
+                // Создаем shared_ptr<T> на основе объекта, хранящегося в variant
+                return std::make_shared<T>(std::get<T>(*it->second));
+            }
+        }
+        return nullptr; // Если объект не найден или тип не совпадает
+    }
+};
+
+int main() {
+    EntityContainer container;
+
+    // Добавляем объекты в контейнер
+    container.addEntity("tank1", std::make_shared<Entity>(Tank{}));
+    container.addEntity("battle1", std::make_shared<Entity>(Battle{}));
+    container.addEntity("tank2", std::make_shared<Entity>(Tank{}));
+
+    // Получаем элемент по ключу
+    if (auto tank = container.getElement<Tank>("tank1")) {
+        std::cout << "Found a Tank with key 'tank1'!" << std::endl;
+        tank->shoot();
+    } else {
+        std::cout << "No Tank found with key 'tank1'!" << std::endl;
+    }
+
+    // Получаем элемент по ключу (несуществующий ключ)
+    if (auto battle = container.getElement<Battle>("unknown_key")) {
+        std::cout << "Found a Battle with key 'unknown_key'!" << std::endl;
+        battle->fight();
+    } else {
+        std::cout << "No Battle found with key 'unknown_key'!" << std::endl;
+    }
+
+    // Получаем элемент по ключу (тип не совпадает)
+    if (auto battle = container.getElement<Battle>("tank1")) {
+        std::cout << "Found a Battle with key 'tank1'!" << std::endl;
+        battle->fight();
+    } else {
+        std::cout << "No Battle found with key 'tank1' (type mismatch)!" << std::endl;
+    }
+
+    return 0;
+}
